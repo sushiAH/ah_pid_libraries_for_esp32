@@ -54,4 +54,9 @@ float run_pid_vel(float target, int motor_id, pid_vel_esp* p);
 
 void run_pid(void* pvParameters);
 
+int read_target_by_operating(motor_controller* p, int operating_mode,
+                             float* target);
+
+int run_pid_by_operating(motor_controller* p, int operating_mode, float target);
+
 #endif
