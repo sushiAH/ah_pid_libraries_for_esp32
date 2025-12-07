@@ -120,6 +120,9 @@ int run_pid_by_operating(motor_controller* p, int operating_mode,
  * @param pvParameters free_rtos_task pointer
  */
 void run_pid(void* pvParameters) {
+  float target = 0;
+  int operating_mode = 0;
+
   motor_controller* p = (motor_controller*)pvParameters;
 
   // 周期管理
@@ -128,8 +131,6 @@ void run_pid(void* pvParameters) {
 
   while (1) {
     // 共有変数から目標値の読み出し
-    float target = 0;
-    int operating_mode = 0;
     if (xSemaphoreTake(p->mutex, portMAX_DELAY) == pdTRUE) {
       operating_mode = p->operating_mode;
       read_target_by_operating(p, operating_mode, &target);
@@ -155,14 +156,14 @@ void init_pid_pos_esp(const float kp, const float ki, const float kd,
                       const int enc_resolution, const int motor_id,
                       pid_pos_esp* p) {
   pos_pid_init(kp, ki, kd, max_output_pwm, max_i_value, &p->PID);
-  enc_init(enc_resolution, motor_id, &p->ENC);
+  enc_init(motor_id, enc_resolution, &p->ENC);
 }
 
 void init_pid_vel_esp(const float kp, const float ki, const float kd,
                       const int max_output_pwm, const int enc_resolution,
                       const int motor_id, pid_vel_esp* p) {
   vel_pid_init(kp, ki, kd, max_output_pwm, &p->PID);
-  enc_init(enc_resolution, motor_id, &p->ENC);
+  enc_init(motor_id, enc_resolution, &p->ENC);
 }
 
 /**

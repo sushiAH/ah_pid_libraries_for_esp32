@@ -6,9 +6,10 @@
 
 #include "ah_encoder_esp32.h"
 
-// -- Config --
-const int ENC_PINNUM_A[4] = {22, 21, 18, 17};  // motor_id 0,1,2,3
-const int ENC_PINNUM_B[4] = {23, 19, 5, 16};
+// params
+// 使用する基盤に応じて変更する
+const int ENC_PINNUM_A[4] = {2, 16, 18, 23};
+const int ENC_PINNUM_B[4] = {15, 5, 17, 19};
 
 /**
  * @brief エンコーダーの立ち上げ
@@ -17,7 +18,7 @@ const int ENC_PINNUM_B[4] = {23, 19, 5, 16};
  * @param motor_id モーターID
  * @param p
  */
-void enc_init(const int enc_resolution, int motor_id, encoder *p) {
+void enc_init(int motor_id, const int enc_resolution, encoder *p) {
   p->enc_resolution = enc_resolution;
   p->enc_pinnum_a = ENC_PINNUM_A[motor_id];
   p->enc_pinnum_b = ENC_PINNUM_B[motor_id];
@@ -31,10 +32,11 @@ void enc_init(const int enc_resolution, int motor_id, encoder *p) {
   } else if (motor_id == 3) {
     p->PCNT_UNIT = PCNT_UNIT_3;
   }
-  qei_setup_x1(p->PCNT_UNIT, ENC_PINNUM_A[motor_id], ENC_PINNUM_B[motor_id]);
 
   pinMode(ENC_PINNUM_A[motor_id], INPUT_PULLUP);
   pinMode(ENC_PINNUM_B[motor_id], INPUT_PULLUP);
+
+  qei_setup_x1(p->PCNT_UNIT, ENC_PINNUM_A[motor_id], ENC_PINNUM_B[motor_id]);
 }
 
 /**
