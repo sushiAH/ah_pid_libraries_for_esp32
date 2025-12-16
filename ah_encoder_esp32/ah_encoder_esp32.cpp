@@ -8,8 +8,9 @@
 
 // params
 // 使用する基盤に応じて変更する
-const int ENC_PINNUM_A[4] = {2, 16, 18, 23};
-const int ENC_PINNUM_B[4] = {15, 5, 17, 19};
+
+const int ENC_PINNUM_A[4] = {19, 18, 16, 2};
+const int ENC_PINNUM_B[4] = {23, 17, 5, 15};
 
 /**
  * @brief エンコーダーの立ち上げ

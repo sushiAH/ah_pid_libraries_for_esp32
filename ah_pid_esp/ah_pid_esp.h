@@ -59,4 +59,12 @@ int read_target_by_operating(motor_controller* p, int operating_mode,
 
 int run_pid_by_operating(motor_controller* p, int operating_mode, float target);
 
+void set_mode(int operating_mode, motor_controller* ctrl);
+void set_pos(float goal_pos, motor_controller* ctrl);
+void set_vel(float goal_vel, motor_controller* ctrl);
+void set_pwm(int goal_pwm, motor_controller* ctrl);
+
+float read_current_pos(motor_controller* ctrl);
+float read_current_vel(motor_controller* ctrl);
+
 #endif
