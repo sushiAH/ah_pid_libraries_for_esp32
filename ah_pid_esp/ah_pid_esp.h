@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include <ah_encoder_esp32.h>
 #include <ah_pid_controller.h>
+#include <ah_potentio_esp32.h>
+#include <operating_mode.h>
 #include <stdint.h>
 
 struct pid_pos_esp {
@@ -30,7 +32,8 @@ struct motor_controller {
   int32_t goal_vel_int;     // 2
   int32_t current_pos_int;  // 3
   int32_t current_vel_int;  // 4
-  int32_t goal_pwm;
+  int32_t goal_pwm;         // 5
+  int32_t air_val;          // 6
 };
 
 void init_motor_controller(const int max_output_pwm, const int max_i_value,
@@ -50,6 +53,7 @@ void init_pid_vel_esp(const float kp, const float ki, const float kd,
 void write_to_motor(int pwm, const int CHANNEL_NUM, const int PINNUM_DIR);
 
 float run_pid_pos(float target, int motor_id, pid_pos_esp* p);
+float run_pid_pos_with_potentio(float target, int motor_id, pid_pos_esp* p);
 float run_pid_vel(float target, int motor_id, pid_vel_esp* p);
 
 void run_pid(void* pvParameters);

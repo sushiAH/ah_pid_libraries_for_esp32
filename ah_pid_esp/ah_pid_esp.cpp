@@ -10,6 +10,8 @@
 const int PINNUM_POWER[4] = {32, 26, 27, 12};
 const int PINNUM_DIR[4] = {33, 25, 14, 13};
 
+const int PINNUM_AIR[4] = {0, 25, 0, 0};
+
 /**
  * @brief motor_controller構造体の初期化
  *
@@ -37,6 +39,7 @@ void init_motor_controller(const int max_output_pwm, const int max_i_value,
 
   init_pid_pos_esp(0, 0, 0, max_output_pwm, max_i_value, enc_resolution,
                    motor_id, &ctrl->POS);
+
   init_pid_vel_esp(0, 0, 0, max_output_pwm, enc_resolution, motor_id,
                    &ctrl->VEL);
 
@@ -47,7 +50,7 @@ void init_motor_controller(const int max_output_pwm, const int max_i_value,
               "pid",        // タスク名
               4096,         // スタックサイズ
               (void*)ctrl,  // タスクに渡す引数
-              3,            // 優先度
+              5,            // 優先度
               NULL          // タスクハンドル
   );
 
@@ -67,18 +70,27 @@ void init_motor_controller(const int max_output_pwm, const int max_i_value,
  */
 int read_target_by_operating(motor_controller* ctrl, int operating_mode,
                              float* target) {
-  if (operating_mode == 1) {
+  if (operating_mode == encoder_position_mode) {
+    *target = (float(ctrl->goal_pos_int) / 1000.0);
+    return 0;
+
+  } else if (operating_mode == potentio_position_mode) {
     *target = (float(ctrl->goal_pos_int) / 1000.0);
     return 0;
   }
 
-  else if (operating_mode == 2) {
+  else if (operating_mode == velocity_mode) {
     *target = (float(ctrl->goal_vel_int) / 1000.0);
     return 0;
   }
 
-  else if (operating_mode == 3) {
+  else if (operating_mode == pwm_mode) {
     *target = (float(ctrl->goal_pwm) / 1000.0);
+    return 0;
+  }
+
+  else if (operating_mode == air_mode) {
+    *target = ctrl->air_val;
     return 0;
   }
 
@@ -95,17 +107,29 @@ int read_target_by_operating(motor_controller* ctrl, int operating_mode,
  */
 int run_pid_by_operating(motor_controller* ctrl, int operating_mode,
                          float target) {
-  if (operating_mode == 1) {
+  if (operating_mode == encoder_position_mode) {
     run_pid_pos(target, ctrl->motor_id, &ctrl->POS);
     return 0;
 
-  } else if (operating_mode == 2) {
+  } else if (operating_mode == potentio_position_mode) {
+    run_pid_pos_with_potentio(target, ctrl->motor_id, &ctrl->POS);
+    return 0;
+
+  } else if (operating_mode == velocity_mode) {
     run_pid_vel(target, ctrl->motor_id, &ctrl->VEL);
     return 0;
 
-  } else if (operating_mode == 3) {
+  } else if (operating_mode == pwm_mode) {
     update_vel(&ctrl->VEL.ENC);
-    write_to_motor(target, ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
+    write_to_motor(int(target), ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
+    return 0;
+
+  } else if (operating_mode == air_mode) {
+    digitalWrite(PINNUM_AIR[ctrl->motor_id], target);
+    return 0;
+
+  } else if (operating_mode == stop_mode){
+    write_to_motor(0, ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
     return 0;
   }
 
@@ -159,6 +183,7 @@ void init_pid_pos_esp(const float kp, const float ki, const float kd,
                       pid_pos_esp* pid_pos) {
   pos_pid_init(kp, ki, kd, max_output_pwm, max_i_value, &pid_pos->PID);
   enc_init(motor_id, enc_resolution, &pid_pos->ENC);
+  potentio_init(motor_id);
 }
 
 void init_pid_vel_esp(const float kp, const float ki, const float kd,
@@ -200,6 +225,24 @@ void write_to_motor(int pwm, const int CHANNEL_NUM, const int PINNUM_DIR) {
  */
 float run_pid_pos(float target, int motor_id, pid_pos_esp* pid_pos) {
   float pos = update_pos(&pid_pos->ENC);
+  int pos_pid = calc_pos_pid(target, pos, &pid_pos->PID);
+  write_to_motor(pos_pid, motor_id, PINNUM_DIR[motor_id]);
+
+  return pos;
+}
+
+/**
+ * @brief pid位置制御実行 with potentio meter
+ *
+ * @param target 目標値
+ * @param motor_id
+ * @param pid_pos
+ * @return 現在のabsolute position
+ */
+float run_pid_pos_with_potentio(float target, int motor_id,
+                                pid_pos_esp* pid_pos) {
+  float pos = read_potentio(motor_id);
+  pid_pos->ENC.pos = pos;
   int pos_pid = calc_pos_pid(target, pos, &pid_pos->PID);
   write_to_motor(pos_pid, motor_id, PINNUM_DIR[motor_id]);
 

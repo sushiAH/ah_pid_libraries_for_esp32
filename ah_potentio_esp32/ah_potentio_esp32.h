@@ -3,7 +3,7 @@
 
 #include <driver/adc.h>
 
-void init_potentio(int motor_id);
-int read_potentio(int motor_id);
+void potentio_init(int motor_id);
+float read_potentio(int motor_id);
 
 #endif
