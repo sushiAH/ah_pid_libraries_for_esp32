@@ -7,8 +7,8 @@
 
 // ---- Config ----
 // ピンの並びは使用する基盤に合わせて要変更
-const int PINNUM_POWER[4] = {32, 26, 27, 12};
-const int PINNUM_DIR[4] = {33, 25, 14, 13};
+const int PINNUM_POWER[4] = {32, 26, 14, 12};
+const int PINNUM_DIR[4] = {33, 25, 27, 13};
 
 const int PINNUM_AIR[4] = {0, 25, 0, 0};
 
