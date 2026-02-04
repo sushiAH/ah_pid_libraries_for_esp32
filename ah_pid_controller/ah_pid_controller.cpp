@@ -19,7 +19,8 @@
  */
 void pos_pid_init(const float kp, const float ki, const float kd,
                   const int max_output_pwm, const int max_i_value,
-                  pos_pid_controller* p) {
+                  pos_pid_controller* p)
+{
   p->kp = kp;
   p->ki = ki;
   p->kd = kd;
@@ -39,7 +40,8 @@ void pos_pid_init(const float kp, const float ki, const float kd,
  * @param kp 比例ゲイン
  * @return positional_pid_p
  */
-float calc_pos_p(float target, float current, const float kp) {
+float calc_pos_p(float target, float current, const float kp)
+{
   float error = target - current;
   float pos_p = kp * error;
 
@@ -58,7 +60,8 @@ float calc_pos_p(float target, float current, const float kp) {
  * @return I値
  */
 float calc_pos_i(float target, float current, float dt, float pre_i_value,
-                 const float ki, const int max_i_value) {
+                 const float ki, const int max_i_value)
+{
   float error = target - current;
 
   float pos_i = pre_i_value + ki * error * dt;
@@ -86,7 +89,8 @@ float calc_pos_i(float target, float current, float dt, float pre_i_value,
  * @return d値
  */
 float calc_pos_d(float target, float current, float dt, float pre_error,
-                 const float kd) {
+                 const float kd)
+{
   float error = target - current;
   float pos_d = kd * ((error - pre_error) / dt);
 
@@ -102,7 +106,8 @@ float calc_pos_d(float target, float current, float dt, float pre_error,
  * @return positional_pid_value
  */
 int calc_pos_pid(float target, float current,  // 位置型pid
-                 pos_pid_controller* p) {
+                 pos_pid_controller* p)
+{
   unsigned int now_time = millis();
   float dt = (now_time - p->pre_time) / 1000.00;  // seconds
 
@@ -137,7 +142,8 @@ int calc_pos_pid(float target, float current,  // 位置型pid
 }
 
 void vel_pid_init(const float kp, const float ki, const float kd,
-                  const int max_output_pwm, vel_pid_controller* p) {
+                  const int max_output_pwm, vel_pid_controller* p)
+{
   p->kp = kp;
   p->ki = ki;
   p->kd = kd;
@@ -149,24 +155,28 @@ void vel_pid_init(const float kp, const float ki, const float kd,
   p->pre_vel_pid = 0;
 }
 
-float calc_vel_p(float error, float pre_error, const float kp) {
+float calc_vel_p(float error, float pre_error, const float kp)
+{
   float vel_p = kp * (error - pre_error);
   return vel_p;
 }
 
-float calc_vel_i(float error, float dt, const float ki) {
+float calc_vel_i(float error, float dt, const float ki)
+{
   float vel_i = ki * (error)*dt;
   return vel_i;
 }
 
 float calc_vel_d(float error, float pre_error, float pre_pre_error,
-                 const float kd) {
+                 const float kd)
+{
   float vel_d = kd * (error - 2 * pre_error + pre_pre_error);
   return vel_d;
 }
 
 int calc_vel_pid(float target, float current,  // 速度型pid
-                 vel_pid_controller* p) {
+                 vel_pid_controller* p)
+{
   unsigned int now_time = millis();
   float dt = (now_time - p->pre_time) / 1000.00;  // seconds
   if (p->pre_time == 0 || dt == 0) {

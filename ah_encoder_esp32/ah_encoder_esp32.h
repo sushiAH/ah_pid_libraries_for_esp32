@@ -20,7 +20,8 @@ struct encoder {
   float pos;
 };
 
-void enc_init(int motor_id, const int enc_resolution, encoder* p);
+void enc_init(const int pcnt_unit_num, const int enc_pinnum_a,
+              const int enc_pinnnum_b, const int enc_resolution, encoder* p);
 
 float update_vel(encoder* p);
 float update_pos(encoder* p);

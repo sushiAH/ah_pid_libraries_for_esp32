@@ -6,12 +6,6 @@
 
 #include "ah_encoder_esp32.h"
 
-// params
-// 使用する基盤に応じて変更する
-
-const int ENC_PINNUM_A[4] = {23, 18, 21, 2};
-const int ENC_PINNUM_B[4] = {19, 17, 16, 15};
-
 /**
  * @brief エンコーダーの立ち上げ
  *
@@ -19,25 +13,27 @@ const int ENC_PINNUM_B[4] = {19, 17, 16, 15};
  * @param motor_id モーターID
  * @param p
  */
-void enc_init(int motor_id, const int enc_resolution, encoder *p) {
+void enc_init(const int pcnt_unit_num, const int enc_pinnum_a,
+              const int enc_pinnum_b, const int enc_resolution, encoder *p)
+{
   p->enc_resolution = enc_resolution;
-  p->enc_pinnum_a = ENC_PINNUM_A[motor_id];
-  p->enc_pinnum_b = ENC_PINNUM_B[motor_id];
+  p->enc_pinnum_a = enc_pinnum_a;
+  p->enc_pinnum_b = enc_pinnum_b;
 
-  if (motor_id == 0) {
+  if (pcnt_unit_num == 0) {
     p->PCNT_UNIT = PCNT_UNIT_0;
-  } else if (motor_id == 1) {
+  } else if (pcnt_unit_num == 1) {
     p->PCNT_UNIT = PCNT_UNIT_1;
-  } else if (motor_id == 2) {
+  } else if (pcnt_unit_num == 2) {
     p->PCNT_UNIT = PCNT_UNIT_2;
-  } else if (motor_id == 3) {
+  } else if (pcnt_unit_num == 3) {
     p->PCNT_UNIT = PCNT_UNIT_3;
   }
 
-  pinMode(ENC_PINNUM_A[motor_id], INPUT_PULLUP);
-  pinMode(ENC_PINNUM_B[motor_id], INPUT_PULLUP);
+  pinMode(enc_pinnum_a, INPUT_PULLUP);
+  pinMode(enc_pinnum_b, INPUT_PULLUP);
 
-  qei_setup_x1(p->PCNT_UNIT, ENC_PINNUM_A[motor_id], ENC_PINNUM_B[motor_id]);
+  qei_setup_x1(p->PCNT_UNIT, enc_pinnum_a, enc_pinnum_b);
 }
 
 /**
@@ -50,7 +46,8 @@ void enc_init(int motor_id, const int enc_resolution, encoder *p) {
  * @return rpm
  */
 float calc_rpm_from_countdiff(int16_t now_count, int16_t pre_count,
-                              int enc_resolution, float dt) {
+                              int enc_resolution, float dt)
+{
   int delta_count = now_count - pre_count;
   float delta_count_f = (float)delta_count;
   float diff_count_sec = (delta_count_f / dt);
@@ -66,7 +63,8 @@ float calc_rpm_from_countdiff(int16_t now_count, int16_t pre_count,
  * @param enc_resolution エンコーダー分解能
  * @return motor_position [degree]
  */
-float calc_degree(int16_t now_count, int enc_resolution) {
+float calc_degree(int16_t now_count, int enc_resolution)
+{
   float pos_degree = ((double)now_count / enc_resolution) * 360;  // degree
   //
   return pos_degree;
@@ -79,7 +77,8 @@ float calc_degree(int16_t now_count, int enc_resolution) {
  * @param pre_time 前回時間
  * @return 微小時間
  */
-float calc_dt(unsigned int now_time, unsigned int pre_time) {
+float calc_dt(unsigned int now_time, unsigned int pre_time)
+{
   float dt = (now_time - pre_time) / 1000.000f;
 
   if (dt == 0.0f || pre_time == 0) {
@@ -95,7 +94,8 @@ float calc_dt(unsigned int now_time, unsigned int pre_time) {
  * @param
  * @return rpm
  */
-float update_vel(encoder *p) {
+float update_vel(encoder *p)
+{
   unsigned int now_time = millis();
 
   float dt = calc_dt(now_time, p->pre_time);
@@ -119,7 +119,8 @@ float update_vel(encoder *p) {
  * @param p encoder pointer
  * @return motor_pos [degree]
  */
-float update_pos(encoder *p) {
+float update_pos(encoder *p)
+{
   pcnt_get_counter_value(p->PCNT_UNIT, &p->now_count);
   float pos = calc_degree(p->now_count, p->enc_resolution);
 
