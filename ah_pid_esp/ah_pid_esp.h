@@ -32,24 +32,4 @@ struct motor_controller {
 void init_motor_controller(const int max_output_pwm, const int max_i_value, const int enc_resolution,
                            const unsigned int pid_period, const int motor_id, struct motor_controller *ctrl);
 
-void write_to_motor(int pwm, const int CHANNEL_NUM, const int PINNUM_DIR);
-
-float run_pid_pos(float target, int motor_id, pos_pid_controller *pid_pos, ENC *enc);
-float run_pid_pos_with_potentio(float target, int motor_id, pos_pid_controller *pid_pos, ENC *enc);
-float run_pid_vel(float target, int motor_id, vel_pid_controller *pid_vel, ENC *enc);
-
-void run_pid(void *pvParameters);
-
-int read_target_by_operating(motor_controller *ctrl, int operating_mode, float *target);
-
-int run_pid_by_operating(motor_controller *ctrl, int operating_mode, float target);
-
-void set_mode(int operating_mode, motor_controller *ctrl);
-void set_pos(float goal_pos, motor_controller *ctrl);
-void set_vel(float goal_vel, motor_controller *ctrl);
-void set_pwm(int goal_pwm, motor_controller *ctrl);
-
-float read_current_pos(motor_controller *ctrl);
-float read_current_vel(motor_controller *ctrl);
-
 #endif

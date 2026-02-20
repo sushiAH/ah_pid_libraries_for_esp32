@@ -31,6 +31,8 @@ float calc_pos_d(float target, float current, float dt, float pre_error, const f
 
 int calc_pos_pid(float target, float current, pos_pid_controller *p);
 
+void reset_pos_pid(pos_pid_controller *pos_pid);
+
 // velocity_pid
 struct vel_pid_controller {
     // private
@@ -53,5 +55,7 @@ float calc_vel_i(float error, float dt, const float ki);
 float calc_vel_d(float error, float pre_error, float pre_pre_error, const float kd);
 
 int calc_vel_pid(float target, float current, vel_pid_controller *p);
+
+void reset_vel_pid(vel_pid_controller *vel_pid);
 
 #endif

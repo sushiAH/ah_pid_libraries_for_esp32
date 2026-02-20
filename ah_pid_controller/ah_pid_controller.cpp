@@ -26,9 +26,7 @@ void init_pos_pid(const float kp, const float ki, const float kd, const int max_
     p->max_output_pwm = max_output_pwm;
     p->max_i_value = max_i_value;
 
-    p->pre_time = 0;
-    p->pre_error = 0;
-    p->pre_i_value = 0;
+    reset_pos_pid(p);
 }
 
 /**
@@ -144,10 +142,7 @@ void init_vel_pid(const float kp, const float ki, const float kd, const int max_
     p->kd = kd;
     p->max_output_pwm = max_output_pwm;
 
-    p->pre_time = 0;
-    p->pre_error = 0;
-    p->pre_pre_error = 0;
-    p->pre_vel_pid = 0;
+    reset_vel_pid(p);
 }
 
 float calc_vel_p(float error, float pre_error, const float kp)
@@ -200,4 +195,20 @@ int calc_vel_pid(float target, float current, // 速度型pid
     p->pre_vel_pid = vel_pid;
 
     return vel_pid;
+}
+
+void reset_pos_pid(pos_pid_controller *pos_pid)
+{
+    pos_pid->pre_time = 0;
+    pos_pid->pre_error = 0.00;
+    pos_pid->pre_i_value = 0.00;
+    pos_pid->pre_pos_pid = 0;
+}
+
+void reset_vel_pid(vel_pid_controller *vel_pid)
+{
+    vel_pid->pre_time = 0;
+    vel_pid->pre_error = 0.00;
+    vel_pid->pre_pre_error = 0.00;
+    vel_pid->pre_vel_pid = 0;
 }

@@ -23,7 +23,7 @@ struct encoder {
 void init_enc(const int pcnt_unit_num, const int enc_pinnum_a, const int enc_pinnnum_b, const int enc_resolution,
               encoder *p);
 
-float update_vel(encoder *p);
-float update_pos(encoder *p);
+void reset_enc(encoder *p);
+void update_enc(encoder *p);
 
 #endif

@@ -15,8 +15,278 @@ const int PINNUM_DIR[4] = {33, 25, 14, 13};
 const int PINNUM_AIR[4] = {0, 25, 0, 0};
 
 // pinnum array for encoder
-const int ENC_PINNUM_A[4] = {19, 17, 21, 15};
-const int ENC_PINNUM_B[4] = {23, 18, 16, 2};
+const int ENC_PINNUM_A[4] = {23, 17, 21, 15};
+const int ENC_PINNUM_B[4] = {19, 18, 16, 2};
+
+/**
+ * @brief pid位置制御実行
+ *
+ * @param target 目標値
+ * @param motor_id
+ * @param p
+ * @return 現在のposition
+ */
+static float run_pid_pos(float target, int motor_id, struct pos_pid_controller *pid_pos, struct encoder *enc)
+{
+    update_enc(enc);
+    int pid_pos_value = calc_pos_pid(target, enc->pos, pid_pos);
+    write_to_motor(pid_pos_value, motor_id, PINNUM_DIR[motor_id]);
+
+    return pid_pos_value;
+}
+
+/**
+ * @brief pid位置制御実行 with potentio meter
+ *
+ * @param target 目標値
+ * @param motor_id
+ * @return 現在のabsolute position
+ * @param pid_pos
+ */
+static float run_pid_pos_with_potentio(float target, int motor_id, struct pos_pid_controller *pid_pos,
+                                       struct encoder *enc)
+{
+    float pos = read_potentio(motor_id);
+    enc->pos = pos;
+    int pid_pos_value = calc_pos_pid(target, pos, pid_pos);
+    write_to_motor(pid_pos_value, motor_id, PINNUM_DIR[motor_id]);
+
+    return pid_pos_value;
+}
+
+/**
+ * @brief pid速度制御実行
+ *
+ * @param target 目標値
+ * @param motor_id
+ * @param p
+ * @return 現在のvelocity
+ */
+static float run_pid_vel(float target, int motor_id, struct vel_pid_controller *pid_vel, struct encoder *enc)
+{
+    update_enc(enc);
+    int pid_vel_value = calc_vel_pid(target, enc->vel, pid_vel);
+    write_to_motor(pid_vel_value, motor_id, PINNUM_DIR[motor_id]);
+
+    return pid_vel_value;
+}
+
+static float run_pid_cascade_pos(float target, int motor_id, struct vel_pid_controller *pid_vel,
+                                 struct pos_pid_controller *pid_pos, struct encoder *enc)
+{
+    update_enc(enc);
+    int pid_pos_value = calc_pos_pid(target, enc->pos, pid_pos);
+    int pid_vel_value = calc_vel_pid(pid_pos_value, enc->vel, pid_vel);
+
+    write_to_motor(pid_vel_value, motor_id, PINNUM_DIR[motor_id]);
+
+    return pid_vel_value;
+}
+
+/**
+ * @brief 共有変数,operating_modeに書き込み
+ * mode
+ * 1 position
+ * 2 velocity
+ * 3 pwm
+ * @param operating_mode
+ * @param ctrl
+ */
+static void set_mode(int operating_mode, struct motor_controller *ctrl)
+{
+    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
+        ctrl->operating_mode = operating_mode;
+        xSemaphoreGive(ctrl->mutex);
+    }
+}
+
+/**
+ * @brief 共有変数、goal_pos_intに書き込み
+ *
+ * @param goal_pos
+ * @param ctrl
+ */
+static void set_pos(float goal_pos, struct motor_controller *ctrl)
+{
+    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
+        ctrl->goal_pos_int = int32_t(goal_pos * 1000);
+        xSemaphoreGive(ctrl->mutex);
+    }
+}
+
+/**
+ * @brief 共有変数、goal_velに書き込み
+ *
+ * @param goal_vel
+ * @param ctrl
+ */
+static void set_vel(float goal_vel, struct motor_controller *ctrl)
+{
+    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
+        ctrl->goal_vel_int = int32_t(goal_vel * 1000);
+        xSemaphoreGive(ctrl->mutex);
+    }
+}
+
+static void set_pwm(int goal_pwm, struct motor_controller *ctrl)
+{
+    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
+        ctrl->goal_pwm = goal_pwm * 1000;
+        xSemaphoreGive(ctrl->mutex);
+    }
+}
+
+/**
+ * @brief 現在のposを返す
+ *
+ * @param ctrl
+ * @return 現在のpos [float]
+ */
+static float read_current_pos(struct motor_controller *ctrl)
+{
+    float current_pos = 0;
+    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
+        current_pos = float(ctrl->current_pos_int / 1000.0);
+        xSemaphoreGive(ctrl->mutex);
+    }
+    return current_pos;
+}
+
+/**
+ * @brief 現在のvelを返す
+ *
+ * @param ctrl
+ * @return 現在のvel [float]
+ */
+static float read_current_vel(struct motor_controller *ctrl)
+{
+    float current_vel = 0;
+    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
+        current_vel = float(ctrl->current_vel_int / 1000.0);
+        xSemaphoreGive(ctrl->mutex);
+    }
+    return current_vel;
+}
+
+/**
+ * @brief operating_modeに応じて、目標値を返す
+ *
+ * @param p
+ * @param target 目標値のポインタ
+ * @return err
+ */
+static int read_target_by_operating(int operating_mode, float *target, struct motor_controller *ctrl)
+{
+    if (operating_mode == encoder_position_mode) {
+        *target = (float(ctrl->goal_pos_int) / 1000.0);
+        return 0;
+
+    } else if (operating_mode == potentio_position_mode) {
+        *target = (float(ctrl->goal_pos_int) / 1000.0);
+        return 0;
+    }
+
+    else if (operating_mode == velocity_mode) {
+        *target = (float(ctrl->goal_vel_int) / 1000.0);
+        return 0;
+    }
+
+    else if (operating_mode == pwm_mode) {
+        *target = (float(ctrl->goal_pwm) / 1000.0);
+        return 0;
+    }
+
+    else if (operating_mode == air_mode) {
+        *target = ctrl->air_val;
+        return 0;
+    }
+
+    else {
+        return operating_mode;
+    }
+}
+
+/**
+ * @brief operating_mode に応じてpidを実行する
+ *
+ * @param p
+ * @param target 目標値
+ */
+static int run_pid_by_operating(int operating_mode, float target, struct motor_controller *ctrl)
+{
+    if (operating_mode == encoder_position_mode) {
+        run_pid_pos(target, ctrl->motor_id, &ctrl->POS_PID, &ctrl->ENC);
+        return 0;
+
+    } else if (operating_mode == potentio_position_mode) {
+        run_pid_pos_with_potentio(target, ctrl->motor_id, &ctrl->POS_PID, &ctrl->ENC);
+        return 0;
+
+    } else if (operating_mode == velocity_mode) {
+        run_pid_vel(target, ctrl->motor_id, &ctrl->VEL_PID, &ctrl->ENC);
+        return 0;
+
+    } else if (operating_mode == pwm_mode) {
+        update_enc(&ctrl->ENC);
+        write_to_motor(int(target), ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
+        return 0;
+
+    } else if (operating_mode == air_mode) {
+        digitalWrite(PINNUM_AIR[ctrl->motor_id], target);
+        return 0;
+
+    } else if (operating_mode == stop_mode) {
+        write_to_motor(0, ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
+        reset_enc(&ctrl->ENC);
+        reset_pos_pid(&ctrl->POS_PID);
+        reset_vel_pid(&ctrl->VEL_PID);
+        return 0;
+    }
+
+    else {
+        return operating_mode;
+    }
+}
+
+/**
+ * @brief
+ * motor_controllerの共有変数へ、目標値の書き込み,現在値の読み出しを行う。
+ * 目標値に追従するようにpidを実行する
+ *
+ * @param pvParameters free_rtos_task pointer
+ */
+static void run_pid(void *pvParameters)
+{
+    float target = 0;
+    int operating_mode = 0;
+
+    motor_controller *ctrl = (motor_controller *)pvParameters;
+
+    // 周期管理
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(ctrl->pid_period);
+
+    while (1) {
+        // 共有変数から目標値の読み出し
+        if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
+            operating_mode = ctrl->operating_mode;
+            read_target_by_operating(operating_mode, &target, ctrl);
+            xSemaphoreGive(ctrl->mutex);
+        }
+
+        // pid実行
+        run_pid_by_operating(operating_mode, target, ctrl);
+
+        // 共有データの書き込み
+        if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
+            ctrl->current_pos_int = int32_t(ctrl->ENC.pos * 1000);
+            ctrl->current_vel_int = int32_t(ctrl->ENC.vel * 1000);
+            xSemaphoreGive(ctrl->mutex);
+        }
+
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
+}
 
 /**
  * @brief motor_controller構造体の初期化
@@ -59,259 +329,4 @@ void init_motor_controller(const int max_output_pwm, const int max_i_value, cons
     );
 
     init_motor(PINNUM_POWER[motor_id], motor_id, PINNUM_DIR[motor_id]);
-}
-
-/**
- * @brief operating_modeに応じて、目標値を返す
- *
- * @param p
- * @param target 目標値のポインタ
- * @return err
- */
-int read_target_by_operating(motor_controller *ctrl, int operating_mode, float *target)
-{
-    if (operating_mode == encoder_position_mode) {
-        *target = (float(ctrl->goal_pos_int) / 1000.0);
-        return 0;
-
-    } else if (operating_mode == potentio_position_mode) {
-        *target = (float(ctrl->goal_pos_int) / 1000.0);
-        return 0;
-    }
-
-    else if (operating_mode == velocity_mode) {
-        *target = (float(ctrl->goal_vel_int) / 1000.0);
-        return 0;
-    }
-
-    else if (operating_mode == pwm_mode) {
-        *target = (float(ctrl->goal_pwm) / 1000.0);
-        return 0;
-    }
-
-    else if (operating_mode == air_mode) {
-        *target = ctrl->air_val;
-        return 0;
-    }
-
-    else {
-        return operating_mode;
-    }
-}
-
-/**
- * @brief operating_mode に応じてpidを実行する
- *
- * @param p
- * @param target 目標値
- */
-int run_pid_by_operating(motor_controller *ctrl, int operating_mode, float target)
-{
-    if (operating_mode == encoder_position_mode) {
-        run_pid_pos(target, ctrl->motor_id, &ctrl->POS_PID, &ctrl->ENC);
-        return 0;
-
-    } else if (operating_mode == potentio_position_mode) {
-        run_pid_pos_with_potentio(target, ctrl->motor_id, &ctrl->POS_PID, &ctrl->ENC);
-        return 0;
-
-    } else if (operating_mode == velocity_mode) {
-        run_pid_vel(target, ctrl->motor_id, &ctrl->VEL_PID, &ctrl->ENC);
-        return 0;
-
-    } else if (operating_mode == pwm_mode) {
-        update_vel(&ctrl->ENC);
-        write_to_motor(int(target), ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
-        return 0;
-
-    } else if (operating_mode == air_mode) {
-        digitalWrite(PINNUM_AIR[ctrl->motor_id], target);
-        return 0;
-
-    } else if (operating_mode == stop_mode) {
-        write_to_motor(0, ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
-        esp_restart();
-        return 0;
-    }
-
-    else {
-        return operating_mode;
-    }
-}
-
-/**
- * @brief
- * motor_controllerの共有変数へ、目標値の書き込み,現在値の読み出しを行う。
- * 目標値に追従するようにpidを実行する
- *
- * @param pvParameters free_rtos_task pointer
- */
-void run_pid(void *pvParameters)
-{
-    float target = 0;
-    int operating_mode = 0;
-
-    motor_controller *ctrl = (motor_controller *)pvParameters;
-
-    // 周期管理
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(ctrl->pid_period);
-
-    while (1) {
-        // 共有変数から目標値の読み出し
-        if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
-            operating_mode = ctrl->operating_mode;
-            read_target_by_operating(ctrl, operating_mode, &target);
-            xSemaphoreGive(ctrl->mutex);
-        }
-
-        // pid実行
-        run_pid_by_operating(ctrl, operating_mode, target);
-
-        // 共有データの書き込み
-        if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
-            ctrl->current_pos_int = int32_t(ctrl->POS.ENC.pos * 1000);
-            ctrl->current_vel_int = int32_t(ctrl->VEL.ENC.vel * 1000);
-            xSemaphoreGive(ctrl->mutex);
-        }
-
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
-    }
-}
-
-/**
- * @brief pid位置制御実行
- *
- * @param target 目標値
- * @param motor_id
- * @param p
- * @return 現在のposition
- */
-float run_pid_pos(float target, int motor_id, pos_pid_controller *pid_pos, ENC *enc)
-{
-    float pos = update_pos(enc);
-    int pid_value = calc_pos_pid(target, pos, pid_pos);
-    write_to_motor(pid_value, motor_id, PINNUM_DIR[motor_id]);
-
-    return pos;
-}
-
-/**
- * @brief pid位置制御実行 with potentio meter
- *
- * @param target 目標値
- * @param motor_id
- * @return 現在のabsolute position
- * @param pid_pos
- */
-float run_pid_pos_with_potentio(float target, int motor_id, pos_pid_controller *pid_pos, ENC *enc)
-{
-    float pos = read_potentio(motor_id);
-    enc->pos = pos;
-    int pid_value = calc_pos_pid(target, pos, pid_pos);
-    write_to_motor(pid_value, motor_id, PINNUM_DIR[motor_id]);
-
-    return pos;
-}
-
-/**
- * @brief pid速度制御実行
- *
- * @param target 目標値
- * @param motor_id
- * @param p
- * @return 現在のvelocity
- */
-float run_pid_vel(float target, int motor_id, vel_pid_controller *pid_vel, ENC *enc)
-{
-    float vel = update_vel(enc);
-    int pid_value = calc_vel_pid(target, vel, pid_vel);
-    write_to_motor(pid_value, motor_id, PINNUM_DIR[motor_id]);
-
-    return vel;
-}
-
-/**
- * @brief 共有変数,operating_modeに書き込み
- * mode
- * 1 position
- * 2 velocity
- * 3 pwm
- * @param operating_mode
- * @param ctrl
- */
-void set_mode(int operating_mode, motor_controller *ctrl)
-{
-    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
-        ctrl->operating_mode = operating_mode;
-        xSemaphoreGive(ctrl->mutex);
-    }
-}
-
-/**
- * @brief 共有変数、goal_pos_intに書き込み
- *
- * @param goal_pos
- * @param ctrl
- */
-void set_pos(float goal_pos, motor_controller *ctrl)
-{
-    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
-        ctrl->goal_pos_int = int32_t(goal_pos * 1000);
-        xSemaphoreGive(ctrl->mutex);
-    }
-}
-
-/**
- * @brief 共有変数、goal_velに書き込み
- *
- * @param goal_vel
- * @param ctrl
- */
-void set_vel(float goal_vel, motor_controller *ctrl)
-{
-    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
-        ctrl->goal_vel_int = int32_t(goal_vel * 1000);
-        xSemaphoreGive(ctrl->mutex);
-    }
-}
-
-void set_pwm(int goal_pwm, motor_controller *ctrl)
-{
-    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
-        ctrl->goal_pwm = goal_pwm * 1000;
-        xSemaphoreGive(ctrl->mutex);
-    }
-}
-
-/**
- * @brief 現在のposを返す
- *
- * @param ctrl
- * @return 現在のpos [float]
- */
-float read_current_pos(motor_controller *ctrl)
-{
-    float current_pos = 0;
-    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
-        current_pos = float(ctrl->current_pos_int / 1000.0);
-        xSemaphoreGive(ctrl->mutex);
-    }
-    return current_pos;
-}
-
-/**
- * @brief 現在のvelを返す
- *
- * @param ctrl
- * @return 現在のvel [float]
- */
-float read_current_vel(motor_controller *ctrl)
-{
-    float current_vel = 0;
-    if (xSemaphoreTake(ctrl->mutex, portMAX_DELAY) == pdTRUE) {
-        current_vel = float(ctrl->current_vel_int / 1000.0);
-        xSemaphoreGive(ctrl->mutex);
-    }
-    return current_vel;
 }
