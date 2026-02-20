@@ -17,8 +17,7 @@
  * @param max_i_value i値限界
  * @param p pos_pid_controller pointer
  */
-void pos_pid_init(const float kp, const float ki, const float kd,
-                  const int max_output_pwm, const int max_i_value,
+void init_pos_pid(const float kp, const float ki, const float kd, const int max_output_pwm, const int max_i_value,
                   pos_pid_controller *p)
 {
     p->kp = kp;
@@ -59,8 +58,7 @@ float calc_pos_p(float target, float current, const float kp)
  * @param max_i_value I値限界
  * @return I値
  */
-float calc_pos_i(float target, float current, float dt, float pre_i_value,
-                 const float ki, const int max_i_value)
+float calc_pos_i(float target, float current, float dt, float pre_i_value, const float ki, const int max_i_value)
 {
     float error = target - current;
 
@@ -88,8 +86,7 @@ float calc_pos_i(float target, float current, float dt, float pre_i_value,
  * @param kd 微分ゲイン
  * @return d値
  */
-float calc_pos_d(float target, float current, float dt, float pre_error,
-                 const float kd)
+float calc_pos_d(float target, float current, float dt, float pre_error, const float kd)
 {
     float error = target - current;
     float pos_d = kd * ((error - pre_error) / dt);
@@ -117,8 +114,7 @@ int calc_pos_pid(float target, float current, // 位置型pid
 
     float pos_p = calc_pos_p(target, current, p->kp);
 
-    float pos_i =
-        calc_pos_i(target, current, dt, p->pre_i_value, p->ki, p->max_i_value);
+    float pos_i = calc_pos_i(target, current, dt, p->pre_i_value, p->ki, p->max_i_value);
 
     float pos_d = calc_pos_d(target, current, dt, p->pre_error, p->kd);
 
@@ -141,8 +137,7 @@ int calc_pos_pid(float target, float current, // 位置型pid
     return pos_pid;
 }
 
-void vel_pid_init(const float kp, const float ki, const float kd,
-                  const int max_output_pwm, vel_pid_controller *p)
+void init_vel_pid(const float kp, const float ki, const float kd, const int max_output_pwm, vel_pid_controller *p)
 {
     p->kp = kp;
     p->ki = ki;
@@ -167,8 +162,7 @@ float calc_vel_i(float error, float dt, const float ki)
     return vel_i;
 }
 
-float calc_vel_d(float error, float pre_error, float pre_pre_error,
-                 const float kd)
+float calc_vel_d(float error, float pre_error, float pre_pre_error, const float kd)
 {
     float vel_d = kd * (error - 2 * pre_error + pre_pre_error);
     return vel_d;

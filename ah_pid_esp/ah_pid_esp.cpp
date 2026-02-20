@@ -42,8 +42,10 @@ void init_motor_controller(const int max_output_pwm, const int max_i_value, cons
     ctrl->current_vel_int = 0;
     ctrl->operating_mode = 0;
 
-    init_pid_pos_esp(0, 0, 0, max_output_pwm, max_i_value, enc_resolution, motor_id, &ctrl->POS);
-    init_pid_vel_esp(0, 0, 0, max_output_pwm, enc_resolution, motor_id, &ctrl->VEL);
+    init_pos_pid(0, 0, 0, max_output_pwm, max_i_value, &ctrl->POS_PID);
+    init_vel_pid(0, 0, 0, max_output_pwm, &ctrl->VEL_PID);
+    init_enc(motor_id, ENC_PINNUM_A[motor_id], ENC_PINNUM_B[motor_id], enc_resolution, &ctrl->ENC);
+    init_potentio(motor_id);
 
     ctrl->mutex = xSemaphoreCreateMutex();
 
@@ -106,19 +108,19 @@ int read_target_by_operating(motor_controller *ctrl, int operating_mode, float *
 int run_pid_by_operating(motor_controller *ctrl, int operating_mode, float target)
 {
     if (operating_mode == encoder_position_mode) {
-        run_pid_pos(target, ctrl->motor_id, &ctrl->POS);
+        run_pid_pos(target, ctrl->motor_id, &ctrl->POS_PID, &ctrl->ENC);
         return 0;
 
     } else if (operating_mode == potentio_position_mode) {
-        run_pid_pos_with_potentio(target, ctrl->motor_id, &ctrl->POS);
+        run_pid_pos_with_potentio(target, ctrl->motor_id, &ctrl->POS_PID, &ctrl->ENC);
         return 0;
 
     } else if (operating_mode == velocity_mode) {
-        run_pid_vel(target, ctrl->motor_id, &ctrl->VEL);
+        run_pid_vel(target, ctrl->motor_id, &ctrl->VEL_PID, &ctrl->ENC);
         return 0;
 
     } else if (operating_mode == pwm_mode) {
-        update_vel(&ctrl->VEL.ENC);
+        update_vel(&ctrl->ENC);
         write_to_motor(int(target), ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
         return 0;
 
@@ -128,6 +130,7 @@ int run_pid_by_operating(motor_controller *ctrl, int operating_mode, float targe
 
     } else if (operating_mode == stop_mode) {
         write_to_motor(0, ctrl->motor_id, PINNUM_DIR[ctrl->motor_id]);
+        esp_restart();
         return 0;
     }
 
@@ -176,21 +179,6 @@ void run_pid(void *pvParameters)
     }
 }
 
-void init_pid_pos_esp(const float kp, const float ki, const float kd, const int max_output_pwm, const int max_i_value,
-                      const int enc_resolution, const int motor_id, pid_pos_esp *pid_pos)
-{
-    pos_pid_init(kp, ki, kd, max_output_pwm, max_i_value, &pid_pos->PID);
-    enc_init(motor_id, ENC_PINNUM_A[motor_id], ENC_PINNUM_B[motor_id], enc_resolution, &pid_pos->ENC);
-    potentio_init(motor_id);
-}
-
-void init_pid_vel_esp(const float kp, const float ki, const float kd, const int max_output_pwm,
-                      const int enc_resolution, const int motor_id, pid_vel_esp *pid_vel)
-{
-    vel_pid_init(kp, ki, kd, max_output_pwm, &pid_vel->PID);
-    enc_init(motor_id, ENC_PINNUM_A[motor_id], ENC_PINNUM_B[motor_id], enc_resolution, &pid_vel->ENC);
-}
-
 /**
  * @brief pid位置制御実行
  *
@@ -199,11 +187,11 @@ void init_pid_vel_esp(const float kp, const float ki, const float kd, const int 
  * @param p
  * @return 現在のposition
  */
-float run_pid_pos(float target, int motor_id, pid_pos_esp *pid_pos)
+float run_pid_pos(float target, int motor_id, pos_pid_controller *pid_pos, ENC *enc)
 {
-    float pos = update_pos(&pid_pos->ENC);
-    int pos_pid = calc_pos_pid(target, pos, &pid_pos->PID);
-    write_to_motor(pos_pid, motor_id, PINNUM_DIR[motor_id]);
+    float pos = update_pos(enc);
+    int pid_value = calc_pos_pid(target, pos, pid_pos);
+    write_to_motor(pid_value, motor_id, PINNUM_DIR[motor_id]);
 
     return pos;
 }
@@ -216,12 +204,12 @@ float run_pid_pos(float target, int motor_id, pid_pos_esp *pid_pos)
  * @return 現在のabsolute position
  * @param pid_pos
  */
-float run_pid_pos_with_potentio(float target, int motor_id, pid_pos_esp *pid_pos)
+float run_pid_pos_with_potentio(float target, int motor_id, pos_pid_controller *pid_pos, ENC *enc)
 {
     float pos = read_potentio(motor_id);
-    pid_pos->ENC.pos = pos;
-    int pos_pid = calc_pos_pid(target, pos, &pid_pos->PID);
-    write_to_motor(pos_pid, motor_id, PINNUM_DIR[motor_id]);
+    enc->pos = pos;
+    int pid_value = calc_pos_pid(target, pos, pid_pos);
+    write_to_motor(pid_value, motor_id, PINNUM_DIR[motor_id]);
 
     return pos;
 }
@@ -234,11 +222,11 @@ float run_pid_pos_with_potentio(float target, int motor_id, pid_pos_esp *pid_pos
  * @param p
  * @return 現在のvelocity
  */
-float run_pid_vel(float target, int motor_id, pid_vel_esp *pid_vel)
+float run_pid_vel(float target, int motor_id, vel_pid_controller *pid_vel, ENC *enc)
 {
-    float vel = update_vel(&pid_vel->ENC);
-    int vel_pid = calc_vel_pid(target, vel, &pid_vel->PID);
-    write_to_motor(vel_pid, motor_id, PINNUM_DIR[motor_id]);
+    float vel = update_vel(enc);
+    int pid_value = calc_vel_pid(target, vel, pid_vel);
+    write_to_motor(pid_value, motor_id, PINNUM_DIR[motor_id]);
 
     return vel;
 }

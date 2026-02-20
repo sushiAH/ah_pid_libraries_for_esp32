@@ -13,8 +13,8 @@
  * @param motor_id モーターID
  * @param p
  */
-void enc_init(const int pcnt_unit_num, const int enc_pinnum_a,
-              const int enc_pinnum_b, const int enc_resolution, encoder *p)
+void init_enc(const int pcnt_unit_num, const int enc_pinnum_a, const int enc_pinnum_b, const int enc_resolution,
+              encoder *p)
 {
     p->enc_resolution = enc_resolution;
     p->enc_pinnum_a = enc_pinnum_a;
@@ -45,8 +45,7 @@ void enc_init(const int pcnt_unit_num, const int enc_pinnum_a,
  * @param dt 微小時間
  * @return rpm
  */
-float calc_rpm_from_countdiff(int16_t now_count, int16_t pre_count,
-                              int enc_resolution, float dt)
+float calc_rpm_from_countdiff(int16_t now_count, int16_t pre_count, int enc_resolution, float dt)
 {
     int delta_count = now_count - pre_count;
     float delta_count_f = (float)delta_count;
@@ -101,8 +100,7 @@ float update_vel(encoder *p)
     float dt = calc_dt(now_time, p->pre_time);
 
     pcnt_get_counter_value(p->PCNT_UNIT, &p->now_count);
-    float vel = calc_rpm_from_countdiff(p->now_count, p->pre_count,
-                                        p->enc_resolution, dt);
+    float vel = calc_rpm_from_countdiff(p->now_count, p->pre_count, p->enc_resolution, dt);
 
     // update
     p->pre_time = now_time;
