@@ -16,24 +16,24 @@
 void enc_init(const int pcnt_unit_num, const int enc_pinnum_a,
               const int enc_pinnum_b, const int enc_resolution, encoder *p)
 {
-  p->enc_resolution = enc_resolution;
-  p->enc_pinnum_a = enc_pinnum_a;
-  p->enc_pinnum_b = enc_pinnum_b;
+    p->enc_resolution = enc_resolution;
+    p->enc_pinnum_a = enc_pinnum_a;
+    p->enc_pinnum_b = enc_pinnum_b;
 
-  if (pcnt_unit_num == 0) {
-    p->PCNT_UNIT = PCNT_UNIT_0;
-  } else if (pcnt_unit_num == 1) {
-    p->PCNT_UNIT = PCNT_UNIT_1;
-  } else if (pcnt_unit_num == 2) {
-    p->PCNT_UNIT = PCNT_UNIT_2;
-  } else if (pcnt_unit_num == 3) {
-    p->PCNT_UNIT = PCNT_UNIT_3;
-  }
+    if (pcnt_unit_num == 0) {
+        p->PCNT_UNIT = PCNT_UNIT_0;
+    } else if (pcnt_unit_num == 1) {
+        p->PCNT_UNIT = PCNT_UNIT_1;
+    } else if (pcnt_unit_num == 2) {
+        p->PCNT_UNIT = PCNT_UNIT_2;
+    } else if (pcnt_unit_num == 3) {
+        p->PCNT_UNIT = PCNT_UNIT_3;
+    }
 
-  pinMode(enc_pinnum_a, INPUT_PULLUP);
-  pinMode(enc_pinnum_b, INPUT_PULLUP);
+    pinMode(enc_pinnum_a, INPUT_PULLUP);
+    pinMode(enc_pinnum_b, INPUT_PULLUP);
 
-  qei_setup_x1(p->PCNT_UNIT, enc_pinnum_a, enc_pinnum_b);
+    qei_setup_x1(p->PCNT_UNIT, enc_pinnum_a, enc_pinnum_b);
 }
 
 /**
@@ -48,12 +48,12 @@ void enc_init(const int pcnt_unit_num, const int enc_pinnum_a,
 float calc_rpm_from_countdiff(int16_t now_count, int16_t pre_count,
                               int enc_resolution, float dt)
 {
-  int delta_count = now_count - pre_count;
-  float delta_count_f = (float)delta_count;
-  float diff_count_sec = (delta_count_f / dt);
-  float vel = (diff_count_sec / (float)enc_resolution);
+    int delta_count = now_count - pre_count;
+    float delta_count_f = (float)delta_count;
+    float diff_count_sec = (delta_count_f / dt);
+    float vel = (diff_count_sec / (float)enc_resolution);
 
-  return vel;
+    return vel;
 }
 
 /**
@@ -65,9 +65,9 @@ float calc_rpm_from_countdiff(int16_t now_count, int16_t pre_count,
  */
 float calc_degree(int16_t now_count, int enc_resolution)
 {
-  float pos_degree = ((double)now_count / enc_resolution) * 360;  // degree
-  //
-  return pos_degree;
+    float pos_degree = ((double)now_count / enc_resolution) * 360; // degree
+    //
+    return pos_degree;
 }
 
 /**
@@ -79,13 +79,13 @@ float calc_degree(int16_t now_count, int enc_resolution)
  */
 float calc_dt(unsigned int now_time, unsigned int pre_time)
 {
-  float dt = (now_time - pre_time) / 1000.000f;
+    float dt = (now_time - pre_time) / 1000.000f;
 
-  if (dt == 0.0f || pre_time == 0) {
-    return 0.010f;  // 10ms
-  } else {
-    return dt;
-  }
+    if (dt == 0.0f || pre_time == 0) {
+        return 0.010f; // 10ms
+    } else {
+        return dt;
+    }
 }
 
 /**
@@ -96,21 +96,21 @@ float calc_dt(unsigned int now_time, unsigned int pre_time)
  */
 float update_vel(encoder *p)
 {
-  unsigned int now_time = millis();
+    unsigned int now_time = millis();
 
-  float dt = calc_dt(now_time, p->pre_time);
+    float dt = calc_dt(now_time, p->pre_time);
 
-  pcnt_get_counter_value(p->PCNT_UNIT, &p->now_count);
-  float vel = calc_rpm_from_countdiff(p->now_count, p->pre_count,
-                                      p->enc_resolution, dt);
+    pcnt_get_counter_value(p->PCNT_UNIT, &p->now_count);
+    float vel = calc_rpm_from_countdiff(p->now_count, p->pre_count,
+                                        p->enc_resolution, dt);
 
-  // update
-  p->pre_time = now_time;
-  p->pre_count = 0;
-  pcnt_counter_clear(p->PCNT_UNIT);
-  p->vel = vel;
+    // update
+    p->pre_time = now_time;
+    p->pre_count = 0;
+    pcnt_counter_clear(p->PCNT_UNIT);
+    p->vel = vel;
 
-  return vel;
+    return vel;
 }
 
 /**
@@ -121,11 +121,11 @@ float update_vel(encoder *p)
  */
 float update_pos(encoder *p)
 {
-  pcnt_get_counter_value(p->PCNT_UNIT, &p->now_count);
-  float pos = calc_degree(p->now_count, p->enc_resolution);
+    pcnt_get_counter_value(p->PCNT_UNIT, &p->now_count);
+    float pos = calc_degree(p->now_count, p->enc_resolution);
 
-  // update
-  p->pos = pos;
+    // update
+    p->pos = pos;
 
-  return pos;
+    return pos;
 }
