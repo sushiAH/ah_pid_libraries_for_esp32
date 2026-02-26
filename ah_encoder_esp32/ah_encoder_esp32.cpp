@@ -39,7 +39,7 @@ static float calc_diffdegree(int16_t now_count, int16_t pre_count, int enc_resol
     float delta_count_f = (float)delta_count;
 
     float diff_degree = (delta_count_f / enc_resolution) * 360.00; // degree
-    //
+
     return diff_degree;
 }
 
