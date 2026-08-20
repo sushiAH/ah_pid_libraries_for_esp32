@@ -9,12 +9,16 @@ struct pos_pid_controller {
     float kp, ki, kd; // pid_gain
     int max_output_pwm;
     int max_i_value;
+    float max_vel;
+    float max_acc;
 
     // public
     // 保持する必要があるもののみ
     unsigned int pre_time;
     float pre_error;
     float pre_i_value;
+    float v_state;
+    float current_smooth_target;
 
     // for debug
     int pre_pos_pid;
@@ -29,7 +33,7 @@ float calc_pos_i(float target, float current, float dt, float pre_i_value, const
 
 float calc_pos_d(float target, float current, float dt, float pre_error, const float kd);
 
-int calc_pos_pid(float target, float current, pos_pid_controller *p);
+int calc_pos_pid(float target, float current, float dt, pos_pid_controller *p);
 
 void reset_pos_pid(pos_pid_controller *pos_pid);
 
@@ -54,8 +58,12 @@ float calc_vel_i(float error, float dt, const float ki);
 
 float calc_vel_d(float error, float pre_error, float pre_pre_error, const float kd);
 
-int calc_vel_pid(float target, float current, vel_pid_controller *p);
+int calc_vel_pid(float target, float current, float dt, vel_pid_controller *p);
 
 void reset_vel_pid(vel_pid_controller *vel_pid);
 
+float calc_profile_vel(float pc_goal, float *current_smooth_target, float *v_state,
+                       float max_vel, float max_acc, float dt);
+
+void update_profile_vel(float pc_goal, float dt, pos_pid_controller *pos_pid);
 #endif
